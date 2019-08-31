@@ -1,3 +1,6 @@
 [submodule "third-party/cnpy"]
 	path = third-party/cnpy
 	url = https://github.com/rogersce/cnpy.git
+[submodule "third-party/CL11"]
+	path = third-party/CL11
+	url = https://github.com/CLIUtils/CLI11.git
