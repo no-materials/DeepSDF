@@ -17,7 +17,6 @@ def filter_classes_glob(patterns, classes):
 
     passed_classes = set()
     for pattern in patterns:
-
         passed_classes = passed_classes.union(
             set(filter(lambda x: fnmatch.fnmatch(x, pattern), classes))
         )
@@ -49,12 +48,12 @@ def process_mesh(mesh_filepath, target_filepath, executable, additional_args):
     logging.info(mesh_filepath + " --> " + target_filepath)
     command = [executable, "-m", mesh_filepath, "-o", target_filepath] + additional_args
 
+    print(command)
     subproc = subprocess.Popen(command, stdout=subprocess.DEVNULL)
     subproc.wait()
 
 
 def append_data_source_map(data_dir, name, source):
-
     data_source_map_filename = ws.get_data_source_map_filename(data_dir)
 
     print("data sources stored to " + data_source_map_filename)
@@ -83,7 +82,7 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
         description="Pre-processes data from a data source and append the results to "
-        + "a dataset.",
+                    + "a dataset.",
     )
     arg_parser.add_argument(
         "--data_dir",
@@ -105,7 +104,7 @@ if __name__ == "__main__":
         dest="source_name",
         default=None,
         help="The name to use for the data source. If unspecified, it defaults to the "
-        + "directory name.",
+             + "directory name.",
     )
     arg_parser.add_argument(
         "--split",
@@ -140,7 +139,7 @@ if __name__ == "__main__":
         default=False,
         action="store_true",
         help="If set, the script will produce mesh surface samples for evaluation. "
-        + "Otherwise, the script will produce SDF samples for training.",
+             + "Otherwise, the script will produce SDF samples for training.",
     )
 
     deep_sdf.add_common_args(arg_parser)
@@ -234,9 +233,12 @@ if __name__ == "__main__":
                     )
                     specific_args = ["-n", normalization_param_filename]
 
+                print(shape_dir)
+                print(mesh_filename)
+
                 meshes_targets_and_specific_args.append(
                     (
-                        os.path.join(shape_dir, mesh_filename),
+                        os.path.join(shape_dir, os.path.basename(mesh_filename)),
                         processed_filepath,
                         specific_args,
                     )
@@ -248,13 +250,13 @@ if __name__ == "__main__":
                 logging.warning("Multiple meshes found for instance " + instance_dir)
 
     with concurrent.futures.ThreadPoolExecutor(
-        max_workers=int(args.num_threads)
+            max_workers=int(args.num_threads)
     ) as executor:
 
         for (
-            mesh_filepath,
-            target_filepath,
-            specific_args,
+                mesh_filepath,
+                target_filepath,
+                specific_args,
         ) in meshes_targets_and_specific_args:
             executor.submit(
                 process_mesh,

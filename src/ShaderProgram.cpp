@@ -2,9 +2,135 @@
 
 #include <pangolin/gl/glsl.h>
 
-constexpr const char* shaderText = R"Shader(
+constexpr const char *shaderText12 = R"Shader(
 @start vertex
-#version 330 core
+#version 120
+
+attribute vec3 vertex;
+varying vec4 position_world;
+varying vec4 position_camera;
+varying vec3 viewDirection_camera;
+
+uniform mat4 MVP;
+uniform mat4 V;
+
+void main(){
+
+    // Projected image coordinate
+    gl_Position =  MVP * vec4(vertex,1.0);
+
+    // world coordinate location of the vertex
+    position_world = vec4(vertex,1.0);
+    position_camera = V * vec4(vertex, 1.0);
+
+    viewDirection_camera = normalize(vec3(0.0,0.0,0.0) - position_camera.xyz);
+}
+
+@start geometry
+#version 120
+#extension GL_EXT_geometry_shader4 : enable
+
+varying vec4 position_world[];
+varying vec3 viewDirection_camera[];
+
+varying vec3 normal_camera;
+varying vec3 normal_world;
+varying vec4 xyz_world;
+varying vec3 viewDirection_cam;
+varying vec4 xyz_camera;
+varying float primitiveID;
+
+uniform mat4 V;
+
+void main() {
+    vec3 A = position_world[1].xyz - position_world[0].xyz;
+    vec3 B = position_world[2].xyz - position_world[0].xyz;
+    vec3 normal = normalize(cross(A,B));
+    vec3 normal_cam = (V * vec4(normal,0.0)).xyz;
+
+    gl_Position = gl_PositionIn[0];
+    normal_camera = normal_cam;
+    normal_world = normal;
+    xyz_world = position_world[0];
+    xyz_camera = V * xyz_world;
+    viewDirection_cam = viewDirection_camera[0];
+    primitiveID = gl_PrimitiveIDIn;
+    EmitVertex();
+
+    gl_Position = gl_PositionIn[1];
+    normal_camera = normal_cam;
+    normal_world = normal;
+    xyz_world = position_world[1];
+    xyz_camera = V * xyz_world;
+    viewDirection_cam = viewDirection_camera[1];
+    primitiveID = gl_PrimitiveIDIn;
+
+    EmitVertex();
+
+    gl_Position = gl_PositionIn[2];
+    normal_camera = normal_cam;
+    normal_world = normal;
+    xyz_world = position_world[2];
+    xyz_camera = V * xyz_world;
+    viewDirection_cam = viewDirection_camera[2];
+    primitiveID = gl_PrimitiveIDIn;
+
+    EmitVertex();
+    EndPrimitive();
+}
+
+@start fragment
+#version 120
+
+varying vec3 viewDirection_cam;
+varying vec3 normal_world;
+varying vec3 normal_camera;
+varying vec4 xyz_world;
+varying vec4 xyz_camera;
+varying float primitiveID;
+
+uniform vec2 slant_thr;
+varying vec4 ttt;
+uniform mat4 V;
+uniform mat4 ToWorld;
+
+
+void main(){
+    vec3 view_vector = vec3(0.0,0.0,1.0);
+//    vec3 view_vector = normalize(vec3(0.0,0.0,1.0) - xyz_camera.xyz);
+    vec4 test = vec4(0.0,0.0,0.0,1.0);
+
+    // Check if we need to flip the normal.
+    vec3 normal_world_cor;// = normal_world;
+    float d = dot(normalize(normal_camera), normalize(view_vector));
+
+    if (abs(d) < 0.001) {
+        gl_FragData[0] = vec4(0.0,0.0,0.0,0.0);
+        gl_FragData[1] = vec4(0.0,0.0,0.0,0.0);
+        gl_FragData[2] = vec4(0.0,0.0,0.0,0.0);
+        return;
+    } else {
+        if (d < 0) {
+            test = vec4(0,1,0,1);
+            normal_world_cor = -normal_world;
+        } else {
+            normal_world_cor = normal_world;
+        }
+
+        gl_FragData[0] = xyz_world;
+        gl_FragData[0].w = primitiveID + 1.0f;
+
+        gl_FragData[1] = vec4(normalize(normal_world_cor),1);
+        gl_FragData[1].w = primitiveID + 1.0f;
+    }
+
+}
+)Shader";
+
+
+constexpr const char *shaderText = R"Shader(
+@start vertex
+#version 120 core
 
 layout(location = 0) in vec3 vertex;
 //layout(location = 2) in vec3 vertexNormal_model;
@@ -141,10 +267,17 @@ void main(){
 )Shader";
 
 pangolin::GlSlProgram GetShaderProgram() {
-  pangolin::GlSlProgram program;
+    pangolin::GlSlProgram program;
 
-  program.AddShader(pangolin::GlSlAnnotatedShader, shaderText);
-  program.Link();
+    program.AddShader(pangolin::GlSlAnnotatedShader, shaderText12);
 
-  return std::move(program);
+    // Set geometry shader params
+    glProgramParameteriEXT(program.ProgramId(), GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
+    glProgramParameteriEXT(program.ProgramId(), GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLE_STRIP);
+    glProgramParameteriEXT(program.ProgramId(), GL_GEOMETRY_VERTICES_OUT_EXT, 3);
+    program.Link();
+
+    return std::move(program);
 }
+
+
