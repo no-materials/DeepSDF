@@ -94,6 +94,13 @@ varying vec4 ttt;
 uniform mat4 V;
 uniform mat4 ToWorld;
 
+bool isnan( float val )
+{
+  return ( val < 0.0 || 0.0 < val || val == 0.0 ) ? false : true;
+  // important: some nVidias failed to cope with version below.
+  // Probably wrong optimization.
+  /*return ( val <= 0.0 || 0.0 <= val ) ? false : true;*/
+}
 
 void main(){
     vec3 view_vector = vec3(0.0,0.0,1.0);
@@ -122,6 +129,7 @@ void main(){
 
         gl_FragData[1] = vec4(normalize(normal_world_cor),1);
         gl_FragData[1].w = primitiveID + 1.0f;
+
     }
 
 }

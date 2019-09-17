@@ -49,7 +49,7 @@ def process_mesh(mesh_filepath, target_filepath, executable, additional_args):
     command = [executable, "-m", mesh_filepath, "-o", target_filepath] + additional_args
 
     print(command)
-    subproc = subprocess.Popen(command, stdout=subprocess.DEVNULL)
+    subproc = subprocess.Popen(command)
     subproc.wait()
 
 

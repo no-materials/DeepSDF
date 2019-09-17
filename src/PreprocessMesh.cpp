@@ -135,6 +135,7 @@ void SampleSDFNearSurface(
 
     // Now compute sdf for each xyz sample
     for (int s = 0; s < (int) xyz.size(); s++) {
+        std::cout << s << xyz[s][0] << ", " << xyz[s][1] << ", " << xyz[s][2] << ", " << std::endl;
         Eigen::Vector3f samp_vert = xyz[s];
         std::vector<int> cl_indices(num_votes);
         std::vector<float> cl_distances(num_votes);
@@ -406,8 +407,8 @@ int main(int argc, char **argv) {
 
     // Define Projection and initial ModelView matrix
     pangolin::OpenGlRenderState s_cam(
-            pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.05, 100),
-//            pangolin::ProjectionMatrixOrthographic(-max_dist, max_dist, -max_dist, max_dist, 0, 2.5),
+//            pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.05, 100),
+            pangolin::ProjectionMatrixOrthographic(-max_dist, max_dist, -max_dist, max_dist, 0, 2.5),
             pangolin::ModelViewLookAt(0, 0, -1, 0, 0, 0, pangolin::AxisY));
     pangolin::OpenGlRenderState s_cam2(
             pangolin::ProjectionMatrixOrthographic(-max_dist, max_dist, max_dist, -max_dist, 0, 2.5),
@@ -524,8 +525,10 @@ int main(int argc, char **argv) {
               << "/" << num_tri << ")" << std::endl;
 
     if (wrong_obj_ratio > rejection_criteria_obs || bad_tri_ratio > rejection_criteria_tri) {
-        std::cout << "mesh rejected" << std::endl;
+        std::cout << "Mesh " << meshFileName << " rejected" << std::endl;
         return 0;
+    } else {
+        std::cout << "Mesh " << meshFileName << " passed test!!!!!!!!" << std::endl;
     }
 
 
@@ -538,9 +541,12 @@ int main(int argc, char **argv) {
     }
 
     // Construct KD-Tree from valid surface vert points
+    std::cout << "Building KD-tree for mesh " << meshFileName << std::endl;
     KdVertexList kdVerts(vertices2);
     KdVertexListTree kdTree_surf(3, kdVerts);
     kdTree_surf.buildIndex();
+    std::cout << "KD-tree for mesh " << meshFileName << " built" << std::endl;
+
 
     // Sample points aggressively on surface weighted by tri area
     std::vector<Eigen::Vector3f> xyz;
@@ -551,6 +557,7 @@ int main(int argc, char **argv) {
     SampleFromSurface(geom, xyz_surf, num_samp_near_surface / 2);
 
     // Perturbation of surface points and rest of sampling + SDF calculation, also duration calculation and log
+    std::cout << "Sampling SDFs for mesh " << meshFileName << std::endl;
     auto start = std::chrono::high_resolution_clock::now();
     SampleSDFNearSurface(
             kdTree_surf,
@@ -566,7 +573,8 @@ int main(int argc, char **argv) {
             11);
     auto finish = std::chrono::high_resolution_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(finish - start).count();
-    std::cout << "Perturbation of surface points and rest of sampling + SDF calculation took " << elapsed << " seconds."
+    std::cout << "Perturbation of surface points and rest of sampling + SDF calculation for mesh " << meshFileName
+              << " took " << elapsed << " seconds."
               << std::endl;
 
     // Create PLY file from SDFs if flag is set
@@ -581,6 +589,8 @@ int main(int argc, char **argv) {
     else {
         writeSDFToNPZ(xyz, sdf, npyFileName, true);
     }
+    std::cout << "Preprocess done for mesh " << meshFileName << std::endl << "------------------------------"
+              << std::endl;
 
     return 0;
 }

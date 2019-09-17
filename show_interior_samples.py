@@ -4,6 +4,7 @@
 import ctypes
 import deep_sdf.data
 import sys
+sys.path.append('/Users/nomaterials/Pangolin/build/src')
 
 import OpenGL.GL as gl
 import pypangolin as pango
