@@ -138,7 +138,7 @@ void main(){
 
 constexpr const char *shaderText = R"Shader(
 @start vertex
-#version 120 core
+#version 330 core
 
 layout(location = 0) in vec3 vertex;
 //layout(location = 2) in vec3 vertexNormal_model;

@@ -32,7 +32,7 @@ std::vector<Eigen::Vector4f> ValidPointsFromIm(const pangolin::Image<Eigen::Vect
     for (unsigned int w = 0; w < verts.w; w++) {
         for (unsigned int h = 0; h < verts.h; h++) {
             v = verts(w, h);
-            if (v[3] == 0.0f || isnan(v[0]) || isnan(v[1]) || isnan(v[2])) { // v[3] is set in the fragment shader (gl_FragData[0].w = primitiveID + 1.0f;)
+            if (v[3] == 0.0) { // v[3] is set in the fragment shader (gl_FragData[0].w = primitiveID + 1.0f;)
                 continue;
             }
             points.push_back(v);

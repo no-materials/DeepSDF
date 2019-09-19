@@ -135,7 +135,6 @@ void SampleSDFNearSurface(
 
     // Now compute sdf for each xyz sample
     for (int s = 0; s < (int) xyz.size(); s++) {
-        std::cout << s << xyz[s][0] << ", " << xyz[s][1] << ", " << xyz[s][2] << ", " << std::endl;
         Eigen::Vector3f samp_vert = xyz[s];
         std::vector<int> cl_indices(num_votes);
         std::vector<float> cl_distances(num_votes);
@@ -171,6 +170,7 @@ void SampleSDFNearSurface(
             }
             sdfs.push_back(sdf);
         }
+//        std::cout << s << "  :  " << xyz[s][0] << ", " << xyz[s][1] << ", " << xyz[s][2] << " --> " << sdf << std::endl;
     }
 
     xyz = xyz_used;
@@ -294,7 +294,9 @@ int main(int argc, char **argv) {
     float variance = 0.005;
     int num_sample = 500000;
     float rejection_criteria_obs = 0.02f;
+//    float rejection_criteria_obs = 0.7f;
     float rejection_criteria_tri = 0.03f;
+//    float rejection_criteria_tri = 0.3f;
     float num_samp_near_surf_ratio = 47.0f / 50.0f;
 
 
@@ -378,7 +380,6 @@ int main(int argc, char **argv) {
     pangolin::Image<uint32_t> modelFaces =
             pangolin::get<pangolin::Image<uint32_t >>(geom.objects.begin()->second.attributes["vertex_indices"]);
 
-//    std::cout << *(modelFaces.ptr+ 3 * 29509);
 
     // Center mesh & fit to unit sphere
     float max_dist = BoundingCubeNormalization(geom, true);
