@@ -1,10 +1,8 @@
 #version 330 core
 
-in vec3 viewDirection_cam;
 in vec3 normal_world;
 in vec3 normal_camera;
 in vec4 xyz_world;
-in vec4 xyz_camera;
 
 uniform mat4 V;
 

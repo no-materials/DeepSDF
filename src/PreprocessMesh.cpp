@@ -259,7 +259,7 @@ void SampleSDFNearSurface(
             }
             sdfs.push_back(sdf);
         }
-        std::cout << s << "  :  " << xyz[s][0] << ", " << xyz[s][1] << ", " << xyz[s][2] << " --> " << sdf << std::endl;
+//        std::cout << s << "  :  " << xyz[s][0] << ", " << xyz[s][1] << ", " << xyz[s][2] << " --> " << sdf << std::endl;
     }
 
     xyz = xyz_used;

@@ -9,13 +9,14 @@ in vec3 viewDirection_camera[];
 out vec3 normal_camera;
 out vec3 normal_world;
 out vec4 xyz_world;
-out vec3 viewDirection_cam;
-out vec4 xyz_camera;
 
 uniform mat4 V;
 
 void main()
 {
+    vec4 xyz_camera;
+    vec3 viewDirection_cam;
+
     vec3 A = position_world[1].xyz - position_world[0].xyz;
     vec3 B = position_world[2].xyz - position_world[0].xyz;
     vec3 normal = normalize(cross(A, B));
