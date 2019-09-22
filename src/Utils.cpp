@@ -3,6 +3,7 @@
 #include "Utils.h"
 
 #include <random>
+#include <glm/glm.hpp>
 
 std::vector<Eigen::Vector3f> EquiDistPointsOnSphere(const uint numSamples, const float radius) {
     std::vector<Eigen::Vector3f> points(numSamples);
@@ -236,6 +237,80 @@ float BoundingCubeNormalization(
             vertices(0, i) /= maxDistance;
             vertices(1, i) /= maxDistance;
             vertices(2, i) /= maxDistance;
+        }
+        maxDistance = 1;
+    }
+
+    return maxDistance;
+}
+
+float TinyBoundingCubeNormalization(
+        std::vector<glm::vec3> &vertices,
+        bool fitToUnitSphere,
+        const float buffer) {
+    float xMin = 1000000, xMax = -1000000, yMin = 1000000, yMax = -1000000, zMin = 1000000,
+            zMax = -1000000;
+
+    const std::size_t numVertices = vertices.size();
+
+    // TODO
+    ///////// Only consider vertices that were used in some face
+//    std::vector<unsigned char> verticesUsed(numVertices, 0);
+//    // turn to true if the vertex is used
+//    for (const auto &object : geom.objects) {
+//        auto itVertIndices = object.second.attributes.find("vertex_indices");
+//        if (itVertIndices != object.second.attributes.end()) {
+//            pangolin::Image<uint32_t> ibo =
+//                    pangolin::get<pangolin::Image<uint32_t>>(itVertIndices->second);
+//
+//            for (uint i = 0; i < ibo.h; ++i) {
+//                for (uint j = 0; j < 3; ++j) {
+//                    verticesUsed[ibo(j, i)] = 1;
+//                }
+//            }
+//        }
+//    }
+    /////////
+
+    // compute min max in each dimension
+    for (size_t i = 0; i < numVertices; i++) {
+        // pass when it's not used.
+//        if (verticesUsed[i] == 0)
+//            continue;
+        xMin = fmin(xMin, vertices[i][0]);
+        yMin = fmin(yMin, vertices[i][1]);
+        zMin = fmin(zMin, vertices[i][2]);
+        xMax = fmax(xMax, vertices[i][0]);
+        yMax = fmax(yMax, vertices[i][1]);
+        zMax = fmax(zMax, vertices[i][2]);
+    }
+
+    const float xCenter = (xMax + xMin) / 2.0f;
+    const float yCenter = (yMax + yMin) / 2.0f;
+    const float zCenter = (zMax + zMin) / 2.0f;
+
+    // make the mean zero (center the mesh around (0,0,0))
+    float maxDistance = -1.0f;
+    for (size_t i = 0; i < numVertices; i++) {
+        // pass when it's not used.
+//        if (verticesUsed[i] == 0)
+//            continue;
+        vertices[i][0] -= xCenter;
+        vertices[i][1] -= yCenter;
+        vertices[i][2] -= zCenter;
+
+        const float dist = glm::length(vertices[i]);
+        maxDistance = std::max(maxDistance, dist);
+    }
+
+    // add some buffer
+    maxDistance *= buffer;
+
+    if (fitToUnitSphere) {
+        for (size_t i = 0; i < numVertices; i++) {
+            vertices[i][0] /= maxDistance;
+            vertices[i][1] /= maxDistance;
+            vertices[i][2] /= maxDistance;
         }
         maxDistance = 1;
     }

@@ -3,10 +3,7 @@
 
 import ctypes
 import deep_sdf.data
-import numpy as np
-from numpy import isnan
 import sys
-
 sys.path.append('/Users/nomaterials/Pangolin/build/src')
 
 import OpenGL.GL as gl
@@ -19,24 +16,11 @@ if __name__ == "__main__":
         sys.exit(1)
 
     npz_filename = sys.argv[1]
+
     data = deep_sdf.data.read_sdf_samples_into_ram(npz_filename)
 
     xyz_neg = data[1][:, 0:3].numpy().astype(ctypes.c_float)
-    sdf_neg = data[1][:, 3].numpy().astype(ctypes.c_float)
-    rgb_neg = np.zeros_like(xyz_neg).astype(ctypes.c_float)
 
-    xyz_pos = data[0][:, 0:3].numpy().astype(ctypes.c_float)
-    sdf_pos = data[0][:, 3].numpy().astype(ctypes.c_float)
-    rgb_pos = np.zeros_like(xyz_pos).astype(ctypes.c_float)
-
-    s = 10.
-    rgb_neg[:, 0] = np.minimum(s * sdf_neg / sdf_neg.min(), np.ones_like(sdf_neg))
-    rgb_neg[:, 1] = 1. - rgb_neg[:, 0]
-
-    rgb_pos[:, 2] = np.minimum(s * sdf_pos / sdf_pos.max(), np.ones_like(sdf_pos))
-    rgb_pos[:, 1] = 1. - rgb_pos[:, 2]
-
-    # GL Handling
     win = pango.CreateWindowAndBind("Interior Samples | " + npz_filename, 640, 480)
     gl.glEnable(gl.GL_DEPTH_TEST)
 
@@ -53,7 +37,7 @@ if __name__ == "__main__":
             pango.Attach(0),
             pango.Attach(1),
             -640.0 / 480.0,
-        )
+            )
             .SetHandler(handler)
     )
 
@@ -62,21 +46,20 @@ if __name__ == "__main__":
     )
 
     while not pango.ShouldQuit():
+
         gl.glClear(gl.GL_COLOR_BUFFER_BIT + gl.GL_DEPTH_BUFFER_BIT)
         d_cam.Activate(s_cam)
 
         gl.glEnableClientState(gl.GL_VERTEX_ARRAY)
-        gl.glEnableClientState(gl.GL_COLOR_ARRAY)
 
-        gl.glVertexPointer(3, gl.GL_FLOAT, 0, xyz_neg.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
-        gl.glColorPointer(3, gl.GL_FLOAT, 0, rgb_neg.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
+        gl.glColor3ub(255, 255, 255)
+
+        gl.glVertexPointer(
+            3, gl.GL_FLOAT, 0, xyz_neg.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+        )
+
         gl.glDrawArrays(gl.GL_POINTS, 0, xyz_neg.shape[0])
 
-        gl.glVertexPointer(3, gl.GL_FLOAT, 0, xyz_pos.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
-        gl.glColorPointer(3, gl.GL_FLOAT, 0, rgb_pos.ctypes.data_as(ctypes.POINTER(ctypes.c_float)))
-        gl.glDrawArrays(gl.GL_POINTS, 0, xyz_pos.shape[0])
-
-        gl.glDisableClientState(gl.GL_COLOR_ARRAY)
         gl.glDisableClientState(gl.GL_VERTEX_ARRAY)
 
         pango.FinishFrame()
