@@ -1038,9 +1038,9 @@ virtualRenderTest(float max_dist, int numOfFaces, const std::vector<glm::vec3> &
               << "/" << num_tri << ")" << std::endl;
 
     if (wrong_obj_ratio > rejection_criteria_obs || bad_tri_ratio > rejection_criteria_tri) {
-        std::cout << "Mesh " << meshFileName << " REJECTED" << std::endl;
-        free();
-        exit(1);
+        std::cout << "Mesh " << meshFileName << " REJECTED - but will continue" << std::endl;
+//        free();
+//        exit(1);
     } else {
         std::cout << "Mesh " << meshFileName << " PASSED!!!!!!!!" << std::endl;
     }
@@ -1065,7 +1065,7 @@ int main(int argc, char **argv) {
     bool test_flag = false;
     float variance = 0.005;
     int num_sample = 500000;
-    float rejection_criteria_obs = 0.028f;
+    float rejection_criteria_obs = 0.02f;
 //    float rejection_criteria_obs = 0.7f;
     float rejection_criteria_tri = 0.03f;
 //    float rejection_criteria_tri = 0.3f;
