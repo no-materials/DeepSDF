@@ -25,7 +25,7 @@ void compileShader(GLuint& shaderID, const char* file) {
     int infoLogLength;
 
     // compile Vertex Shader
-    cout << "Compiling shader: " << file << endl;
+//    cout << "Compiling shader: " << file << endl;
     char const* sourcePointer = shaderCode.c_str();
     glShaderSource(shaderID, 1, &sourcePointer, NULL);
     glCompileShader(shaderID);
@@ -58,7 +58,7 @@ GLuint loadShaders(const char* vertexFilePath,
     }
 
     // Link the program
-    cout << "Linking shaders... " << endl;
+//    cout << "Linking shaders... " << endl;
     GLuint programID = glCreateProgram();
     glAttachShader(programID, vertexShaderID);
     if (geometryFilePath)
@@ -89,7 +89,7 @@ GLuint loadShaders(const char* vertexFilePath,
     glDetachShader(programID, fragmentShaderID);
     glDeleteShader(fragmentShaderID);
 
-    cout << "Shader program complete." << endl;
+//    cout << "Shader program complete." << endl;
 
     return programID;
 }

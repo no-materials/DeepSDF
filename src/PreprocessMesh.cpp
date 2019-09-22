@@ -746,7 +746,7 @@ void initializeGL(bool vis, std::string meshfilename) {
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
     // Log
-    logGLParameters();
+//    logGLParameters();
 
     // Create camera
     camera = new Camera(window);
@@ -1159,7 +1159,6 @@ int main(int argc, char **argv) {
     // Center mesh & fit to unit sphere
     BoundingCubeNormalization(geom, true);
 
-
     // Sample points aggressively on surface weighted by tri area
     std::vector<Eigen::Vector3f> xyz;
     std::vector<Eigen::Vector3f> xyz_surf;
@@ -1167,12 +1166,6 @@ int main(int argc, char **argv) {
     int num_samp_near_surface = (int) (47 * num_sample / 50);  // 470000?
     std::cout << "Num of samples near surface: " << num_samp_near_surface << std::endl;
     SampleFromSurface(geom, xyz_surf, num_samp_near_surface / 2);
-//    TinySampleFromSurface(
-//            attrib,
-//            shapes,
-//            xyz_surf,
-//            num_samp_near_surface / 2
-//    );
 
     // Perturbation of surface points and rest of sampling + SDF calculation, also duration calculation and log
     std::cout << "Sampling SDFs for mesh " << meshFileName << std::endl;
