@@ -691,7 +691,7 @@ int oldMain(int argc, char **argv) {
 // -------------------------------------------------------------------------------
 
 
-void initializeGL(bool vis, std::string meshfilename) {
+void initializeGL(bool vis, const std::string& meshfilename) {
     // Initialize GLFW
     if (!glfwInit()) {
         throw std::runtime_error("Failed to initialize GLFW\n");
@@ -708,6 +708,7 @@ void initializeGL(bool vis, std::string meshfilename) {
         windowWidth = 640;
         windowHeight = 480;
     } else {
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         windowWidth = 1;
         windowHeight = 1;
     }
