@@ -38,6 +38,7 @@ class Decoder(nn.Module):
         self.weight_norm = weight_norm
 
         for layer in range(0, self.num_layers - 1):
+            # Set outer dim for each layer - 4th layer (latent in) is adjusted by first (latent + xyz)
             if layer + 1 in latent_in:
                 out_dim = dims[layer + 1] - dims[0]
             else:
@@ -45,6 +46,7 @@ class Decoder(nn.Module):
                 if self.xyz_in_all and layer != self.num_layers - 2:
                     out_dim -= 3
 
+            # Create Linear module layer - wrapped with weight norm hooks or not
             if weight_norm and layer in self.norm_layers:
                 setattr(
                     self,

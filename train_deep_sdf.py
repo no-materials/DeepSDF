@@ -217,13 +217,13 @@ def append_parameter_magnitudes(param_mag_log, model):
         param_mag_log[name].append(param.data.norm().item())
 
 
-def main_function(experiment_directory, continue_from, batch_split):
+def main_function(experiment_directory, continue_from, batch_split, device):
 
     logging.debug("running " + experiment_directory)
 
     specs = ws.load_experiment_specifications(experiment_directory)
 
-    logging.info("Experiment description: \n" + specs["Description"])
+    logging.info("Experiment description: \n" + specs["Description"][0])
 
     data_source = specs["DataSource"]
     train_split_file = specs["TrainSplit"]
@@ -301,20 +301,20 @@ def main_function(experiment_directory, continue_from, batch_split):
 
     scene_per_subbatch = scene_per_batch // batch_split
 
-    min_vec = torch.ones(num_samp_per_scene * scene_per_subbatch, 1).cuda() * minT
-    max_vec = torch.ones(num_samp_per_scene * scene_per_subbatch, 1).cuda() * maxT
+    min_vec = torch.ones(num_samp_per_scene * scene_per_subbatch, 1, device=device) * minT
+    max_vec = torch.ones(num_samp_per_scene * scene_per_subbatch, 1, device=device) * maxT
 
     do_code_regularization = get_spec_with_default(specs, "CodeRegularization", True)
     code_reg_lambda = get_spec_with_default(specs, "CodeRegularizationLambda", 1e-4)
 
     code_bound = get_spec_with_default(specs, "CodeBound", None)
 
-    decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]).cuda()
+    decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]).to(device)
 
-    logging.info("training with {} GPU(s)".format(torch.cuda.device_count()))
-
-    # if torch.cuda.device_count() > 1:
-    decoder = torch.nn.DataParallel(decoder)
+    # Parallelize if GPUs available
+    if torch.cuda.is_available():
+        logging.info("training with {} GPU(s)".format(torch.cuda.device_count()))
+        decoder = torch.nn.DataParallel(decoder)
 
     num_epochs = specs["NumEpochs"]
     log_frequency = get_spec_with_default(specs, "LogFrequency", 10)
@@ -347,11 +347,11 @@ def main_function(experiment_directory, continue_from, batch_split):
 
     lat_vecs = []
 
+    # Inits the latent Tensors of each scene with values drawn from the normal distribution
     for _i in range(num_scenes):
         vec = (
-            torch.ones(1, latent_size)
+            torch.ones(1, latent_size, device=device)
             .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 1.0))
-            .cuda()
         )
         vec.requires_grad = True
         lat_vecs.append(vec)
@@ -438,12 +438,12 @@ def main_function(experiment_directory, continue_from, batch_split):
 
             for _subbatch in range(batch_split):
 
-                # Process the input datag
-                latent_inputs = torch.zeros(0).cuda()
+                # Process the input data
+                latent_inputs = torch.zeros(0, device=device)
                 sdf_data.requires_grad = False
 
-                sdf_data = (sdf_data.cuda()).reshape(
-                    num_samp_per_scene * scene_per_subbatch, 4
+                sdf_data = sdf_data.reshape(
+                    num_samp_per_scene * scene_per_subbatch, 4, device=device
                 )
                 xyz = sdf_data[:, 0:3]
                 sdf_gt = sdf_data[:, 3].unsqueeze(1)
@@ -555,4 +555,10 @@ if __name__ == "__main__":
 
     deep_sdf.configure_logging(args)
 
-    main_function(args.experiment_directory, args.continue_from, int(args.batch_split))
+    args.device = None
+    if torch.cuda.is_available():
+        args.device = torch.device('cuda')
+    else:
+        args.device = torch.device('cpu')
+
+    main_function(args.experiment_directory, args.continue_from, int(args.batch_split), args.device)
