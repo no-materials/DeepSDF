@@ -304,7 +304,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
     comment = \
         f' batch_size={scene_per_subbatch} lrDecoderInit={lr_schedules[0].initial} lrLatInit={lr_schedules[1].initial}'
     tb = SummaryWriter(comment=comment)
-    tb.add_graph(decoder)
+    # tb.add_graph(decoder)
 
     # Parallelize if GPUs available
     if torch.cuda.is_available():
