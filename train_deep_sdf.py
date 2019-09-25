@@ -10,6 +10,7 @@ import logging
 import numpy as np
 import json
 import time
+from torch.utils.tensorboard import SummaryWriter
 
 import deep_sdf
 import deep_sdf.workspace as ws
@@ -305,6 +306,11 @@ def main_function(experiment_directory, continue_from, batch_split, device):
         logging.info("training with {} GPU(s)".format(torch.cuda.device_count()))
         decoder = torch.nn.DataParallel(decoder)
 
+    comment = \
+        f' batch_size={scene_per_subbatch} lrDecoderInit={lr_schedules[0].initial} lrLatInit={lr_schedules[1].initial}'
+    tb = SummaryWriter(comment=comment)
+    tb.add_graph(decoder)
+
     num_epochs = specs["NumEpochs"]
     log_frequency = get_spec_with_default(specs, "LogFrequency", 10)
 
@@ -340,7 +346,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
     for _i in range(num_scenes):
         vec = (
             torch.ones(1, latent_size, device=device)
-                 .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 1.0))
+                .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 1.0))
         )
         vec.requires_grad = True
         lat_vecs.append(vec)
@@ -479,6 +485,8 @@ def main_function(experiment_directory, continue_from, batch_split, device):
             if code_bound is not None:
                 deep_sdf.utils.project_vecs_onto_sphere(lat_vecs, code_bound)
 
+            tb.add_scalar('Batch Loss', batch_loss, epoch)
+
         end = time.time()
 
         seconds_elapsed = end - start
@@ -486,9 +494,17 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
         lr_log.append([schedule.get_learning_rate(epoch) for schedule in lr_schedules])
 
-        lat_mag_log.append(get_mean_latent_vector_magnitude(lat_vecs))
+        mean_latent_mag = get_mean_latent_vector_magnitude(lat_vecs)
+        lat_mag_log.append(mean_latent_mag)
 
         append_parameter_magnitudes(param_mag_log, decoder)
+
+        tb.add_scalar('lrDecoder', lr_schedules[0].get_learning_rate(epoch), epoch)
+        tb.add_scalar('lrLatent', lr_schedules[1].get_learning_rate(epoch), epoch)
+        tb.add_scalar('Mean Latent Magnitude', mean_latent_mag, epoch)
+        for name, weight in decoder.named_parameters():
+            tb.add_histogram(name, weight, epoch)
+            tb.add_histogram(f'{name}.grad', weight.grad, epoch)
 
         if epoch in checkpoints:
             save_checkpoints(epoch)
