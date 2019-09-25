@@ -27,12 +27,10 @@ class StepLearningRateSchedule(LearningRateSchedule):
         self.factor = factor
 
     def get_learning_rate(self, epoch):
-
         return self.initial * (self.factor ** (epoch // self.interval))
 
 
 def get_learning_rate_schedules(specs):
-
     schedule_specs = specs["LearningRateSchedule"]
 
     schedules = []
@@ -59,7 +57,6 @@ def get_learning_rate_schedules(specs):
 
 
 def save_model(experiment_directory, filename, decoder, epoch):
-
     model_params_dir = ws.get_model_params_dir(experiment_directory, True)
 
     torch.save(
@@ -69,7 +66,6 @@ def save_model(experiment_directory, filename, decoder, epoch):
 
 
 def save_optimizer(experiment_directory, filename, optimizer, epoch):
-
     optimizer_params_dir = ws.get_optimizer_params_dir(experiment_directory, True)
 
     torch.save(
@@ -79,7 +75,6 @@ def save_optimizer(experiment_directory, filename, optimizer, epoch):
 
 
 def load_optimizer(experiment_directory, filename, optimizer):
-
     full_filename = os.path.join(
         ws.get_optimizer_params_dir(experiment_directory), filename
     )
@@ -97,7 +92,6 @@ def load_optimizer(experiment_directory, filename, optimizer):
 
 
 def save_latent_vectors(experiment_directory, filename, latent_vec, epoch):
-
     latent_codes_dir = ws.get_latent_codes_dir(experiment_directory, True)
 
     all_latents = torch.zeros(0)
@@ -112,7 +106,6 @@ def save_latent_vectors(experiment_directory, filename, latent_vec, epoch):
 
 # TODO: duplicated in workspace
 def load_latent_vectors(experiment_directory, filename, lat_vecs):
-
     full_filename = os.path.join(
         ws.get_latent_codes_dir(experiment_directory), filename
     )
@@ -139,15 +132,14 @@ def load_latent_vectors(experiment_directory, filename, lat_vecs):
 
 
 def save_logs(
-    experiment_directory,
-    loss_log,
-    lr_log,
-    timing_log,
-    lat_mag_log,
-    param_mag_log,
-    epoch,
+        experiment_directory,
+        loss_log,
+        lr_log,
+        timing_log,
+        lat_mag_log,
+        param_mag_log,
+        epoch,
 ):
-
     torch.save(
         {
             "epoch": epoch,
@@ -162,7 +154,6 @@ def save_logs(
 
 
 def load_logs(experiment_directory):
-
     full_filename = os.path.join(experiment_directory, ws.logs_filename)
 
     if not os.path.isfile(full_filename):
@@ -181,7 +172,6 @@ def load_logs(experiment_directory):
 
 
 def clip_logs(loss_log, lr_log, timing_log, lat_mag_log, param_mag_log, epoch):
-
     iters_per_epoch = len(loss_log) // len(lr_log)
 
     loss_log = loss_log[: (iters_per_epoch * epoch)]
@@ -218,7 +208,6 @@ def append_parameter_magnitudes(param_mag_log, model):
 
 
 def main_function(experiment_directory, continue_from, batch_split, device):
-
     logging.debug("running " + experiment_directory)
 
     specs = ws.load_experiment_specifications(experiment_directory)
@@ -351,7 +340,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
     for _i in range(num_scenes):
         vec = (
             torch.ones(1, latent_size, device=device)
-            .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 1.0))
+                 .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 1.0))
         )
         vec.requires_grad = True
         lat_vecs.append(vec)
@@ -443,8 +432,8 @@ def main_function(experiment_directory, continue_from, batch_split, device):
                 sdf_data.requires_grad = False
 
                 sdf_data = sdf_data.reshape(
-                    num_samp_per_scene * scene_per_subbatch, 4, device=device
-                )
+                    num_samp_per_scene * scene_per_subbatch, 4
+                ).to(device)
                 xyz = sdf_data[:, 0:3]
                 sdf_gt = sdf_data[:, 3].unsqueeze(1)
                 for ind in indices.numpy():
@@ -470,18 +459,18 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
                 loss = loss_l1(pred_sdf, sdf_gt)
 
+                # this is where the latent code is optimized by using it's loss
                 if do_code_regularization:
                     l2_size_loss = latent_size_regul(lat_vecs, indices.numpy())
                     loss += code_reg_lambda * min(1, epoch / 100) * l2_size_loss
 
                 loss.backward()
 
-                batch_loss += loss.item()
+                batch_loss += loss.item()  # aggregated weight & latent code losses
 
             loss_log.append(batch_loss)
 
             if grad_clip is not None:
-
                 torch.nn.utils.clip_grad_norm_(decoder.parameters(), grad_clip)
 
             optimizer_all.step()
@@ -528,25 +517,25 @@ if __name__ == "__main__":
         dest="experiment_directory",
         required=True,
         help="The experiment directory. This directory should include "
-        + "experiment specifications in 'specs.json', and logging will be "
-        + "done in this directory as well.",
+             + "experiment specifications in 'specs.json', and logging will be "
+             + "done in this directory as well.",
     )
     arg_parser.add_argument(
         "--continue",
         "-c",
         dest="continue_from",
         help="A snapshot to continue from. This can be 'latest' to continue"
-        + "from the latest running snapshot, or an integer corresponding to "
-        + "an epochal snapshot.",
+             + "from the latest running snapshot, or an integer corresponding to "
+             + "an epochal snapshot.",
     )
     arg_parser.add_argument(
         "--batch_split",
         dest="batch_split",
         default=1,
         help="This splits the batch into separate subbatches which are "
-        + "processed separately, with gradients accumulated across all "
-        + "subbatches. This allows for training with large effective batch "
-        + "sizes in memory constrained environments.",
+             + "processed separately, with gradients accumulated across all "
+             + "subbatches. This allows for training with large effective batch "
+             + "sizes in memory constrained environments.",
     )
 
     deep_sdf.add_common_args(arg_parser)
