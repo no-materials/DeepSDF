@@ -485,7 +485,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
             if code_bound is not None:
                 deep_sdf.utils.project_vecs_onto_sphere(lat_vecs, code_bound)
 
-            tb.add_scalar('Batch Loss', batch_loss, epoch)
+            tb.add_scalar('Batch_Loss', batch_loss, epoch)
 
         end = time.time()
 
@@ -501,7 +501,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
         tb.add_scalar('lrDecoder', lr_schedules[0].get_learning_rate(epoch), epoch)
         tb.add_scalar('lrLatent', lr_schedules[1].get_learning_rate(epoch), epoch)
-        tb.add_scalar('Mean Latent Magnitude', mean_latent_mag, epoch)
+        tb.add_scalar('Mean_Latent_Magnitude', mean_latent_mag, epoch)
         for name, weight in decoder.named_parameters():
             tb.add_histogram(name, weight, epoch)
             tb.add_histogram(f'{name}.grad', weight.grad, epoch)
