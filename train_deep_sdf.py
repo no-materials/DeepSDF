@@ -301,15 +301,15 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
     decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]).to(device)
 
-    # Parallelize if GPUs available
-    if torch.cuda.is_available():
-        logging.info("training with {} GPU(s)".format(torch.cuda.device_count()))
-        decoder = torch.nn.DataParallel(decoder)
-
     comment = \
         f' batch_size={scene_per_subbatch} lrDecoderInit={lr_schedules[0].initial} lrLatInit={lr_schedules[1].initial}'
     tb = SummaryWriter(comment=comment)
     tb.add_graph(decoder)
+
+    # Parallelize if GPUs available
+    if torch.cuda.is_available():
+        logging.info("training with {} GPU(s)".format(torch.cuda.device_count()))
+        decoder = torch.nn.DataParallel(decoder)
 
     num_epochs = specs["NumEpochs"]
     log_frequency = get_spec_with_default(specs, "LogFrequency", 10)
