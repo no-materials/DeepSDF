@@ -41,9 +41,7 @@ def load_model_parameters(experiment_directory, checkpoint, decoder, device):
     if not os.path.isfile(filename):
         raise Exception('model state dict "{}" does not exist'.format(filename))
 
-    data = torch.load(filename, map_location=device)
-
-    print(data["model_state_dict"])
+    data = torch.load(filename)
 
     decoder.load_state_dict(data["model_state_dict"])
 
@@ -84,7 +82,7 @@ def load_latent_vectors(experiment_directory, checkpoint, device):
             + " for checkpoint '{}'".format(experiment_directory, checkpoint)
         )
 
-    data = torch.load(filename, map_location=device)
+    data = torch.load(filename)
 
     num_vecs = data["latent_codes"].size()[0]
 
