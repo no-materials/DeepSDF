@@ -43,6 +43,8 @@ def load_model_parameters(experiment_directory, checkpoint, decoder, device):
 
     data = torch.load(filename, map_location=device)
 
+    print(data["model_state_dict"])
+
     decoder.load_state_dict(data["model_state_dict"])
 
     return data["epoch"]
