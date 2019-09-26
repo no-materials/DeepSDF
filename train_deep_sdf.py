@@ -426,67 +426,70 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
         adjust_learning_rate(lr_schedules, optimizer_all, epoch)
 
+        _subbatch = 0
         for sdf_data, indices in sdf_loader:
 
-            batch_loss = 0.0
+            if _subbatch == 0:
+                batch_loss = 0.0
 
-            optimizer_all.zero_grad()
+                optimizer_all.zero_grad()
 
-            for _subbatch in range(batch_split):
+            # Process the input data
+            latent_inputs = torch.zeros(0, device=device)
+            sdf_data.requires_grad = False
 
-                # Process the input data
-                latent_inputs = torch.zeros(0, device=device)
-                sdf_data.requires_grad = False
+            sdf_data = sdf_data.reshape(
+                num_samp_per_scene * scene_per_subbatch, 4
+            ).to(device)
+            xyz = sdf_data[:, 0:3]
+            sdf_gt = sdf_data[:, 3].unsqueeze(1)
+            for ind in indices.numpy():
+                latent_ind = lat_vecs[ind]
+                latent_repeat = latent_ind.expand(num_samp_per_scene, -1)
+                latent_inputs = torch.cat([latent_inputs, latent_repeat], 0)
+            inputs = torch.cat([latent_inputs, xyz], 1)
 
-                sdf_data = sdf_data.reshape(
-                    num_samp_per_scene * scene_per_subbatch, 4
-                ).to(device)
-                xyz = sdf_data[:, 0:3]
-                sdf_gt = sdf_data[:, 3].unsqueeze(1)
-                for ind in indices.numpy():
-                    latent_ind = lat_vecs[ind]
-                    latent_repeat = latent_ind.expand(num_samp_per_scene, -1)
-                    latent_inputs = torch.cat([latent_inputs, latent_repeat], 0)
-                inputs = torch.cat([latent_inputs, xyz], 1)
+            if enforce_minmax:
+                sdf_gt = deep_sdf.utils.threshold_min_max(sdf_gt, min_vec, max_vec)
 
-                if enforce_minmax:
-                    sdf_gt = deep_sdf.utils.threshold_min_max(sdf_gt, min_vec, max_vec)
+            if latent_size == 0:
+                inputs = xyz
 
-                if latent_size == 0:
-                    inputs = xyz
+            # NN optimization
 
-                # NN optimization
+            pred_sdf = decoder(inputs)
 
-                pred_sdf = decoder(inputs)
+            if enforce_minmax:
+                pred_sdf = deep_sdf.utils.threshold_min_max(
+                    pred_sdf, min_vec, max_vec
+                )
 
-                if enforce_minmax:
-                    pred_sdf = deep_sdf.utils.threshold_min_max(
-                        pred_sdf, min_vec, max_vec
-                    )
+            loss = loss_l1(pred_sdf, sdf_gt)
 
-                loss = loss_l1(pred_sdf, sdf_gt)
+            # this is where the latent code is optimized by using it's loss
+            if do_code_regularization:
+                l2_size_loss = latent_size_regul(lat_vecs, indices.numpy())
+                loss += code_reg_lambda * min(1, epoch / 100) * l2_size_loss
 
-                # this is where the latent code is optimized by using it's loss
-                if do_code_regularization:
-                    l2_size_loss = latent_size_regul(lat_vecs, indices.numpy())
-                    loss += code_reg_lambda * min(1, epoch / 100) * l2_size_loss
+            loss.backward()
 
-                loss.backward()
+            batch_loss += loss.item()  # aggregated weight & latent code losses
 
-                batch_loss += loss.item()  # aggregated weight & latent code losses
+            _subbatch += 1
+            if _subbatch == batch_split:
+                _subbatch = 0
+                loss_log.append(batch_loss)
 
-            loss_log.append(batch_loss)
+                if grad_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(decoder.parameters(), grad_clip)
 
-            if grad_clip is not None:
-                torch.nn.utils.clip_grad_norm_(decoder.parameters(), grad_clip)
+                optimizer_all.step()
 
-            optimizer_all.step()
+                # Project latent vectors onto sphere
+                if code_bound is not None:
+                    deep_sdf.utils.project_vecs_onto_sphere(lat_vecs, code_bound)
 
-            # Project latent vectors onto sphere
-            if code_bound is not None:
-                deep_sdf.utils.project_vecs_onto_sphere(lat_vecs, code_bound)
-
-            tb.add_scalar('Batch_Loss', batch_loss, epoch)
+                tb.add_scalar('Batch_Loss', batch_loss, epoch)
 
         end = time.time()
 

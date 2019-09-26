@@ -12,7 +12,6 @@ import deep_sdf.workspace as ws
 
 
 def code_to_mesh(experiment_directory, checkpoint, keep_normalized=False):
-
     specs_filename = os.path.join(experiment_directory, "specs.json")
 
     if not os.path.isfile(specs_filename):
@@ -41,7 +40,7 @@ def code_to_mesh(experiment_directory, checkpoint, keep_normalized=False):
 
     decoder.eval()
 
-    latent_vectors = ws.load_latent_vectors(experiment_directory, checkpoint, device)
+    latent_vectors = ws.load_latent_vectors(experiment_directory, checkpoint)
 
     train_split_file = specs["TrainSplit"]
 
@@ -81,7 +80,6 @@ def code_to_mesh(experiment_directory, checkpoint, keep_normalized=False):
         scale = None
 
         if not keep_normalized:
-
             normalization_params = np.load(
                 ws.get_normalization_params_filename(
                     data_source, dataset_name, class_name, instance_name
@@ -103,7 +101,6 @@ def code_to_mesh(experiment_directory, checkpoint, keep_normalized=False):
 
 
 if __name__ == "__main__":
-
     arg_parser = argparse.ArgumentParser(
         description="Use a trained DeepSDF decoder to generate a mesh given a latent code."
     )
@@ -113,7 +110,7 @@ if __name__ == "__main__":
         dest="experiment_directory",
         required=True,
         help="The experiment directory which includes specifications and saved model "
-        + "files to use for reconstruction",
+             + "files to use for reconstruction",
     )
     arg_parser.add_argument(
         "--checkpoint",
@@ -121,7 +118,7 @@ if __name__ == "__main__":
         dest="checkpoint",
         default="latest",
         help="The checkpoint weights to use. This can be a number indicated an epoch "
-        + "or 'latest' for the latest weights (this is the default)",
+             + "or 'latest' for the latest weights (this is the default)",
     )
     arg_parser.add_argument(
         "--keep_normalization",
