@@ -386,7 +386,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
         )
 
         model_epoch = ws.load_model_parameters(
-            experiment_directory, continue_from, decoder
+            experiment_directory, continue_from, decoder, device
         )
 
         optimizer_epoch = load_optimizer(
