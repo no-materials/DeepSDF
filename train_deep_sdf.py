@@ -301,11 +301,6 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
     decoder = arch.Decoder(latent_size, **specs["NetworkSpecs"]).to(device)
 
-    comment = \
-        f' batch_size={scene_per_subbatch} lrDecoderInit={lr_schedules[0].initial} lrLatInit={lr_schedules[1].initial}'
-    tb = SummaryWriter(comment=comment)
-    # tb.add_graph(decoder)
-
     # Parallelize if GPUs available
     if torch.cuda.is_available():
         logging.info("training with {} GPU(s)".format(torch.cuda.device_count()))
@@ -313,6 +308,12 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
     num_epochs = specs["NumEpochs"]
     log_frequency = get_spec_with_default(specs, "LogFrequency", 10)
+
+    comment = ''' epochs={0} batch_size={1} lrDecoderInit={2} lrLatInit={3}'''.format(num_epochs, scene_per_subbatch,
+                                                                                      lr_schedules[0].initial,
+                                                                                      lr_schedules[1].initial)
+    tb = SummaryWriter(comment=comment)
+    # tb.add_graph(decoder)
 
     with open(train_split_file, "r") as f:
         train_split = json.load(f)
