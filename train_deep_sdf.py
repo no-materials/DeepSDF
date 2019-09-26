@@ -106,7 +106,7 @@ def save_latent_vectors(experiment_directory, filename, latent_vec, epoch):
 
 
 # TODO: duplicated in workspace
-def load_latent_vectors(experiment_directory, filename, lat_vecs):
+def load_latent_vectors(experiment_directory, filename, lat_vecs, device):
     full_filename = os.path.join(
         ws.get_latent_codes_dir(experiment_directory), filename
     )
@@ -127,7 +127,7 @@ def load_latent_vectors(experiment_directory, filename, lat_vecs):
         raise Exception("latent code dimensionality mismatch")
 
     for i in range(len(lat_vecs)):
-        lat_vecs[i] = data["latent_codes"][i].cuda()
+        lat_vecs[i] = data["latent_codes"][i].to(device=device)
 
     return data["epoch"]
 
@@ -382,7 +382,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
         logging.info('continuing from "{}"'.format(continue_from))
 
         lat_epoch = load_latent_vectors(
-            experiment_directory, continue_from + ".pth", lat_vecs
+            experiment_directory, continue_from + ".pth", lat_vecs, device
         )
 
         model_epoch = ws.load_model_parameters(
