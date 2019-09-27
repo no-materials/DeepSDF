@@ -10,7 +10,7 @@ import logging
 import numpy as np
 import json
 import time
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 import deep_sdf
 import deep_sdf.workspace as ws
@@ -312,7 +312,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
     comment = ''' epochs={0} batch_size={1} lrDecoderInit={2} lrLatInit={3}'''.format(num_epochs, scene_per_subbatch,
                                                                                       lr_schedules[0].initial,
                                                                                       lr_schedules[1].initial)
-    tb = SummaryWriter(comment=comment)
+    # tb = SummaryWriter(comment=comment)
     # tb.add_graph(decoder)
 
     with open(train_split_file, "r") as f:
@@ -489,7 +489,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
                 if code_bound is not None:
                     deep_sdf.utils.project_vecs_onto_sphere(lat_vecs, code_bound)
 
-                tb.add_scalar('Batch_Loss', batch_loss, epoch)
+                # tb.add_scalar('Batch_Loss', batch_loss, epoch)
 
         end = time.time()
 
@@ -503,12 +503,12 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
         append_parameter_magnitudes(param_mag_log, decoder)
 
-        tb.add_scalar('lrDecoder', lr_schedules[0].get_learning_rate(epoch), epoch)
-        tb.add_scalar('lrLatent', lr_schedules[1].get_learning_rate(epoch), epoch)
-        tb.add_scalar('Mean_Latent_Magnitude', mean_latent_mag, epoch)
-        for name, weight in decoder.named_parameters():
-            tb.add_histogram(name, weight, epoch)
-            tb.add_histogram(f'{name}.grad', weight.grad, epoch)
+        # tb.add_scalar('lrDecoder', lr_schedules[0].get_learning_rate(epoch), epoch)
+        # tb.add_scalar('lrLatent', lr_schedules[1].get_learning_rate(epoch), epoch)
+        # tb.add_scalar('Mean_Latent_Magnitude', mean_latent_mag, epoch)
+        # for name, weight in decoder.named_parameters():
+        #     tb.add_histogram(name, weight, epoch)
+        #     tb.add_histogram(f'{name}.grad', weight.grad, epoch)
 
         if epoch in checkpoints:
             save_checkpoints(epoch)
