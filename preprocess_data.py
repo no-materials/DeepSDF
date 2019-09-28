@@ -233,9 +233,6 @@ if __name__ == "__main__":
                     )
                     specific_args = ["-n", normalization_param_filename]
 
-                print(shape_dir)
-                print(mesh_filename)
-
                 meshes_targets_and_specific_args.append(
                     (
                         os.path.join(shape_dir, os.path.basename(mesh_filename)),

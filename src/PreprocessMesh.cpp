@@ -781,10 +781,6 @@ void createContext(std::vector<glm::vec3> objVertices) {
     glDisable(GL_MULTISAMPLE_ARB);
     glShadeModel(GL_FLAT);
 
-    // obj
-    // Task 6.1: bind object vertex positions to attribute 0, UV coordinates
-    // to attribute 1 and normals to attribute 2
-    //*/
     glGenVertexArrays(1, &objVAO);
     glBindVertexArray(objVAO);
 
