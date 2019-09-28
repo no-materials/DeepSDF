@@ -14,18 +14,19 @@ import deep_sdf.workspace as ws
 
 
 def reconstruct(
-    decoder,
-    num_iterations,
-    latent_size,
-    test_sdf,
-    stat,
-    clamp_dist,
-    num_samples=30000,
-    lr=5e-4,
-    l2reg=False,
+        decoder,
+        num_iterations,
+        latent_size,
+        test_sdf,
+        stat,
+        clamp_dist,
+        device,
+        num_samples=30000,
+        lr=5e-4,
+        l2reg=False
 ):
     def adjust_learning_rate(
-        initial_lr, optimizer, num_iterations, decreased_by, adjust_lr_every
+            initial_lr, optimizer, num_iterations, decreased_by, adjust_lr_every
     ):
         lr = initial_lr * ((1 / decreased_by) ** (num_iterations // adjust_lr_every))
         for param_group in optimizer.param_groups:
@@ -35,9 +36,9 @@ def reconstruct(
     adjust_lr_every = int(num_iterations / 2)
 
     if type(stat) == type(0.1):
-        latent = torch.ones(1, latent_size).normal_(mean=0, std=stat).cuda()
+        latent = torch.ones(1, latent_size).normal_(mean=0, std=stat).to(device)
     else:
-        latent = torch.normal(stat[0].detach(), stat[1].detach()).cuda()
+        latent = torch.normal(stat[0].detach(), stat[1].detach()).to(device)
 
     latent.requires_grad = True
 
@@ -51,7 +52,7 @@ def reconstruct(
         decoder.eval()
         sdf_data = deep_sdf.data.unpack_sdf_samples_from_ram(
             test_sdf, num_samples
-        ).cuda()
+        ).to(device)
         xyz = sdf_data[:, 0:3]
         sdf_gt = sdf_data[:, 3].unsqueeze(1)
 
@@ -63,7 +64,7 @@ def reconstruct(
 
         latent_inputs = latent.expand(num_samples, -1)
 
-        inputs = torch.cat([latent_inputs, xyz], 1).cuda()
+        inputs = torch.cat([latent_inputs, xyz], 1).to(device)
 
         pred_sdf = decoder(inputs)
 
@@ -92,7 +93,7 @@ if __name__ == "__main__":
 
     arg_parser = argparse.ArgumentParser(
         description="Use a trained DeepSDF decoder to reconstruct a shape given SDF "
-        + "samples."
+                    + "samples."
     )
     arg_parser.add_argument(
         "--experiment",
@@ -100,7 +101,7 @@ if __name__ == "__main__":
         dest="experiment_directory",
         required=True,
         help="The experiment directory which includes specifications and saved model "
-        + "files to use for reconstruction",
+             + "files to use for reconstruction",
     )
     arg_parser.add_argument(
         "--checkpoint",
@@ -108,7 +109,7 @@ if __name__ == "__main__":
         dest="checkpoint",
         default="latest",
         help="The checkpoint weights to use. This can be a number indicated an epoch "
-        + "or 'latest' for the latest weights (this is the default)",
+             + "or 'latest' for the latest weights (this is the default)",
     )
     arg_parser.add_argument(
         "--data",
@@ -142,13 +143,21 @@ if __name__ == "__main__":
 
     deep_sdf.configure_logging(args)
 
+    args.device = None
+    if torch.cuda.is_available():
+        args.device = torch.device('cuda')
+    else:
+        args.device = torch.device('cpu')
+
+
     def empirical_stat(latent_vecs, indices):
-        lat_mat = torch.zeros(0).cuda()
+        lat_mat = torch.zeros(0).to(args.device)
         for ind in indices:
             lat_mat = torch.cat([lat_mat, latent_vecs[ind]], 0)
         mean = torch.mean(lat_mat, 0)
         var = torch.var(lat_mat, 0)
         return mean, var
+
 
     specs_filename = os.path.join(args.experiment_directory, "specs.json")
 
@@ -170,13 +179,14 @@ if __name__ == "__main__":
     saved_model_state = torch.load(
         os.path.join(
             args.experiment_directory, ws.model_params_subdir, args.checkpoint + ".pth"
-        )
+        ),
+        map_location=args.device
     )
     saved_model_epoch = saved_model_state["epoch"]
 
     decoder.load_state_dict(saved_model_state["model_state_dict"])
 
-    decoder = decoder.module.cuda()
+    decoder = decoder.module.to(args.device)
 
     with open(args.split_filename, "r") as f:
         split = json.load(f)
@@ -238,9 +248,9 @@ if __name__ == "__main__":
                 )
 
             if (
-                args.skip
-                and os.path.isfile(mesh_filename + ".ply")
-                and os.path.isfile(latent_filename)
+                    args.skip
+                    and os.path.isfile(mesh_filename + ".ply")
+                    and os.path.isfile(latent_filename)
             ):
                 continue
 
@@ -257,9 +267,10 @@ if __name__ == "__main__":
                 data_sdf,
                 0.01,  # [emp_mean,emp_var],
                 0.1,
+                args.device,
                 num_samples=8000,
                 lr=5e-3,
-                l2reg=True,
+                l2reg=True
             )
             logging.debug("reconstruct time: {}".format(time.time() - start))
             err_sum += err
@@ -277,7 +288,7 @@ if __name__ == "__main__":
                 start = time.time()
                 with torch.no_grad():
                     deep_sdf.mesh.create_mesh(
-                        decoder, latent, mesh_filename, N=256, max_batch=int(2 ** 18)
+                        decoder, latent, mesh_filename, args.device, N=256, max_batch=int(2 ** 18)
                     )
                 logging.debug("total time: {}".format(time.time() - start))
 
