@@ -16,7 +16,7 @@
     "latent_dropout" : false,
     "weight_norm" : true
     },
-  "CodeLength" : 256,
+  "CodeLength" : 128,
   "NumEpochs" : 1001,
   "SnapshotFrequency" : 250,
   "AdditionalSnapshots" : [ 100, 500 ],

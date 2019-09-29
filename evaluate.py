@@ -88,7 +88,7 @@ def evaluate(experiment_directory, checkpoint, data_dir, split_filename):
 
 
 if __name__ == "__main__":
-
+    # TODO: train chair set with 12 layer autodecoder - skip every for layers
     arg_parser = argparse.ArgumentParser(description="Evaluate a DeepSDF autodecoder")
     arg_parser.add_argument(
         "--experiment",

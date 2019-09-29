@@ -347,7 +347,8 @@ def main_function(experiment_directory, continue_from, batch_split, device):
     for _i in range(num_scenes):
         vec = (
             torch.ones(1, latent_size, device=device)
-                .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 1.0))
+                 .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 0.01))
+            # .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 1.0))
         )
         vec.requires_grad = True
         lat_vecs.append(vec)
