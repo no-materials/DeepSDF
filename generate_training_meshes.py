@@ -11,7 +11,7 @@ import deep_sdf
 import deep_sdf.workspace as ws
 
 
-def code_to_mesh(experiment_directory, checkpoint, keep_normalized=False):
+def code_to_mesh(experiment_directory, checkpoint, device, keep_normalized=False):
     specs_filename = os.path.join(experiment_directory, "specs.json")
 
     if not os.path.isfile(specs_filename):
@@ -30,17 +30,18 @@ def code_to_mesh(experiment_directory, checkpoint, keep_normalized=False):
     decoder = torch.nn.DataParallel(decoder)
 
     saved_model_state = torch.load(
-        os.path.join(experiment_directory, ws.model_params_subdir, checkpoint + ".pth")
+        os.path.join(experiment_directory, ws.model_params_subdir, checkpoint + ".pth"),
+        map_location=device
     )
     saved_model_epoch = saved_model_state["epoch"]
 
     decoder.load_state_dict(saved_model_state["model_state_dict"])
 
-    decoder = decoder.module.cuda()
+    decoder = decoder.module.to(device)
 
     decoder.eval()
 
-    latent_vectors = ws.load_latent_vectors(experiment_directory, checkpoint)
+    latent_vectors = ws.load_latent_vectors(experiment_directory, checkpoint, device)
 
     train_split_file = specs["TrainSplit"]
 
@@ -93,6 +94,7 @@ def code_to_mesh(experiment_directory, checkpoint, keep_normalized=False):
                 decoder,
                 latent_vector,
                 mesh_filename,
+                device,
                 N=256,
                 max_batch=int(2 ** 18),
                 offset=offset,
@@ -133,4 +135,10 @@ if __name__ == "__main__":
 
     deep_sdf.configure_logging(args)
 
-    code_to_mesh(args.experiment_directory, args.checkpoint, args.keep_normalized)
+    args.device = None
+    if torch.cuda.is_available():
+        args.device = torch.device('cuda')
+    else:
+        args.device = torch.device('cpu')
+
+    code_to_mesh(args.experiment_directory, args.checkpoint, args.device, args.keep_normalized)
