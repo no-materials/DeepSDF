@@ -347,7 +347,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
     for _i in range(num_scenes):
         vec = (
             torch.ones(1, latent_size, device=device)
-                 .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 0.01))
+                .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 0.01))
             # .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 1.0))
         )
         vec.requires_grad = True
@@ -465,11 +465,11 @@ def main_function(experiment_directory, continue_from, batch_split, device):
                     pred_sdf, min_vec, max_vec
                 )
 
-            loss = loss_l1(pred_sdf, sdf_gt)
+            loss = loss_l1(pred_sdf, sdf_gt) / batch_split
 
             # this is where the latent code is optimized by using it's loss
             if do_code_regularization:
-                l2_size_loss = latent_size_regul(lat_vecs, indices.numpy())
+                l2_size_loss = latent_size_regul(lat_vecs, indices.numpy()) / batch_split
                 loss += code_reg_lambda * min(1, epoch / 100) * l2_size_loss
 
             loss.backward()
@@ -570,7 +570,5 @@ if __name__ == "__main__":
         args.device = torch.device('cuda')
     else:
         args.device = torch.device('cpu')
-
-
 
     main_function(args.experiment_directory, args.continue_from, int(args.batch_split), args.device)
