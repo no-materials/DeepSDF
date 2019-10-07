@@ -7,10 +7,9 @@ import signal
 import sys
 import os
 import logging
-import numpy as np
+import math
 import json
 import time
-# from torch.utils.tensorboard import SummaryWriter
 
 import deep_sdf
 import deep_sdf.workspace as ws
@@ -31,6 +30,26 @@ class StepLearningRateSchedule(LearningRateSchedule):
         return self.initial * (self.factor ** (epoch // self.interval))
 
 
+class ConstantLearningRateSchedule(LearningRateSchedule):
+    def __init__(self, value):
+        self.value = value
+
+    def get_learning_rate(self, epoch):
+        return self.value
+
+
+class WarmupLearningRateSchedule(LearningRateSchedule):
+    def __init__(self, initial, warmed_up, length):
+        self.initial = initial
+        self.warmed_up = warmed_up
+        self.length = length
+
+    def get_learning_rate(self, epoch):
+        if epoch > self.length:
+            return self.warmed_up
+        return self.initial + (self.warmed_up - self.initial) * epoch / self.length
+
+
 def get_learning_rate_schedules(specs):
     schedule_specs = specs["LearningRateSchedule"]
 
@@ -46,6 +65,16 @@ def get_learning_rate_schedules(specs):
                     schedule_specs["Factor"],
                 )
             )
+        elif schedule_specs["Type"] == "Warmup":
+            schedules.append(
+                WarmupLearningRateSchedule(
+                    schedule_specs["Initial"],
+                    schedule_specs["Final"],
+                    schedule_specs["Length"],
+                )
+            )
+        elif schedule_specs["Type"] == "Constant":
+            schedules.append(ConstantLearningRateSchedule(schedule_specs["Value"]))
 
         else:
             raise Exception(
@@ -95,9 +124,7 @@ def load_optimizer(experiment_directory, filename, optimizer):
 def save_latent_vectors(experiment_directory, filename, latent_vec, epoch):
     latent_codes_dir = ws.get_latent_codes_dir(experiment_directory, True)
 
-    all_latents = torch.zeros(0)
-    for l in latent_vec:
-        all_latents = torch.cat([all_latents, l.cpu().unsqueeze(0)], 0)
+    all_latents = latent_vec.state_dict()
 
     torch.save(
         {"epoch": epoch, "latent_codes": all_latents},
@@ -116,18 +143,24 @@ def load_latent_vectors(experiment_directory, filename, lat_vecs, device):
 
     data = torch.load(full_filename)
 
-    if not len(lat_vecs) == data["latent_codes"].size()[0]:
-        raise Exception(
-            "num latent codes mismatched: {} vs {}".format(
-                len(lat_vecs), data["latent_codes"].size()[2]
+    if isinstance(data["latent_codes"], torch.Tensor):
+
+        # for backwards compatibility
+        if not lat_vecs.num_embeddings == data["latent_codes"].size()[0]:
+            raise Exception(
+                "num latent codes mismatched: {} vs {}".format(
+                    lat_vecs.num_embeddings, data["latent_codes"].size()[0]
+                )
             )
-        )
 
-    if not lat_vecs[0].size()[1] == data["latent_codes"].size()[2]:
-        raise Exception("latent code dimensionality mismatch")
+        if not lat_vecs.embedding_dim == data["latent_codes"].size()[2]:
+            raise Exception("latent code dimensionality mismatch")
 
-    for i in range(len(lat_vecs)):
-        lat_vecs[i] = data["latent_codes"][i].to(device=device)
+        for i, lat_vec in enumerate(data["latent_codes"]):
+            lat_vecs.weight.data[i, :] = lat_vec
+
+    else:
+        lat_vecs.load_state_dict(data["latent_codes"])
 
     return data["epoch"]
 
@@ -193,10 +226,7 @@ def get_spec_with_default(specs, key, default):
 
 
 def get_mean_latent_vector_magnitude(latent_vectors):
-    host_vectors = np.array(
-        [vec.detach().cpu().numpy().squeeze() for vec in latent_vectors]
-    )
-    return np.mean(np.linalg.norm(host_vectors, axis=1))
+    return torch.mean(torch.norm(latent_vectors.weight.data.detach(), dim=1))
 
 
 def append_parameter_magnitudes(param_mag_log, model):
@@ -263,12 +293,6 @@ def main_function(experiment_directory, continue_from, batch_split, device):
         for i, param_group in enumerate(optimizer.param_groups):
             param_group["lr"] = lr_schedules[i].get_learning_rate(epoch)
 
-    def latent_size_regul(latent, indices):
-        latent_loss = 0.0
-        for ind in indices:
-            latent_loss += torch.mean(latent[ind].pow(2))
-        return latent_loss / len(indices)
-
     def empirical_stat(latent_vecs, indices):
         lat_mat = torch.zeros(0).cuda()
         for ind in indices:
@@ -286,14 +310,6 @@ def main_function(experiment_directory, continue_from, batch_split, device):
     maxT = clamp_dist
     enforce_minmax = True
 
-    if not (scene_per_batch % batch_split) == 0:
-        raise RuntimeError("Unequal batch splitting is not supported.")
-
-    scene_per_subbatch = scene_per_batch // batch_split
-
-    min_vec = torch.ones(num_samp_per_scene * scene_per_subbatch, 1, device=device) * minT
-    max_vec = torch.ones(num_samp_per_scene * scene_per_subbatch, 1, device=device) * maxT
-
     do_code_regularization = get_spec_with_default(specs, "CodeRegularization", True)
     code_reg_lambda = get_spec_with_default(specs, "CodeRegularizationLambda", 1e-4)
 
@@ -309,12 +325,6 @@ def main_function(experiment_directory, continue_from, batch_split, device):
     num_epochs = specs["NumEpochs"]
     log_frequency = get_spec_with_default(specs, "LogFrequency", 10)
 
-    comment = ''' epochs={0} batch_size={1} lrDecoderInit={2} lrLatInit={3}'''.format(num_epochs, scene_per_subbatch,
-                                                                                      lr_schedules[0].initial,
-                                                                                      lr_schedules[1].initial)
-    # tb = SummaryWriter(comment=comment)
-    # tb.add_graph(decoder)
-
     with open(train_split_file, "r") as f:
         train_split = json.load(f)
 
@@ -327,7 +337,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
     sdf_loader = data_utils.DataLoader(
         sdf_dataset,
-        batch_size=scene_per_subbatch,
+        batch_size=scene_per_batch,
         shuffle=True,
         num_workers=num_data_loader_threads,
         drop_last=True,
@@ -341,17 +351,12 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
     logging.debug(decoder)
 
-    lat_vecs = []
-
-    # Inits the latent Tensors of each scene with values drawn from the normal distribution
-    for _i in range(num_scenes):
-        vec = (
-            torch.ones(1, latent_size, device=device)
-                .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 0.01))
-            # .normal_(0, get_spec_with_default(specs, "CodeInitStdDev", 1.0))
-        )
-        vec.requires_grad = True
-        lat_vecs.append(vec)
+    lat_vecs = torch.nn.Embedding(num_scenes, latent_size, max_norm=code_bound)
+    torch.nn.init.normal_(
+        lat_vecs.weight.data,
+        0.0,
+        get_spec_with_default(specs, "CodeInitStdDev", 1.0) / math.sqrt(latent_size),
+    )
 
     logging.debug(
         "initialized with mean magnitude {}".format(
@@ -359,7 +364,7 @@ def main_function(experiment_directory, continue_from, batch_split, device):
         )
     )
 
-    loss_l1 = torch.nn.L1Loss()
+    loss_l1 = torch.nn.L1Loss(reduction="sum")
 
     optimizer_all = torch.optim.Adam(
         [
@@ -367,7 +372,10 @@ def main_function(experiment_directory, continue_from, batch_split, device):
                 "params": decoder.parameters(),
                 "lr": lr_schedules[0].get_learning_rate(0),
             },
-            {"params": lat_vecs, "lr": lr_schedules[1].get_learning_rate(0)},
+            {
+                "params": lat_vecs.parameters(),
+                "lr": lr_schedules[1].get_learning_rate(0),
+            },
         ]
     )
 
@@ -417,6 +425,19 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
     logging.info("starting from epoch {}".format(start_epoch))
 
+    logging.info(
+        "Number of decoder parameters: {}".format(
+            sum(p.data.nelement() for p in decoder.parameters())
+        )
+    )
+    logging.info(
+        "Number of shape code parameters: {} (# codes {}, code dim {})".format(
+            lat_vecs.num_embeddings * lat_vecs.embedding_dim,
+            lat_vecs.num_embeddings,
+            lat_vecs.embedding_dim,
+        )
+    )
+
     for epoch in range(start_epoch, num_epochs + 1):
 
         start = time.time()
@@ -427,70 +448,67 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
         adjust_learning_rate(lr_schedules, optimizer_all, epoch)
 
-        _subbatch = 0
         for sdf_data, indices in sdf_loader:
 
-            if _subbatch == 0:
-                batch_loss = 0.0
-
-                optimizer_all.zero_grad()
-
             # Process the input data
-            latent_inputs = torch.zeros(0, device=device)
+            sdf_data = sdf_data.reshape(-1, 4)
+
+            num_sdf_samples = sdf_data.shape[0]
+
             sdf_data.requires_grad = False
 
-            sdf_data = sdf_data.reshape(
-                num_samp_per_scene * scene_per_subbatch, 4
-            ).to(device)
             xyz = sdf_data[:, 0:3]
             sdf_gt = sdf_data[:, 3].unsqueeze(1)
-            for ind in indices.numpy():
-                latent_ind = lat_vecs[ind]
-                latent_repeat = latent_ind.expand(num_samp_per_scene, -1)
-                latent_inputs = torch.cat([latent_inputs, latent_repeat], 0)
-            inputs = torch.cat([latent_inputs, xyz], 1)
 
             if enforce_minmax:
-                sdf_gt = deep_sdf.utils.threshold_min_max(sdf_gt, min_vec, max_vec)
+                sdf_gt = torch.clamp(sdf_gt, minT, maxT)
 
-            if latent_size == 0:
-                inputs = xyz
+            xyz = torch.chunk(xyz, batch_split)
+            indices = torch.chunk(
+                indices.unsqueeze(-1).repeat(1, num_samp_per_scene).view(-1),
+                batch_split,
+            )
 
-            # NN optimization
+            sdf_gt = torch.chunk(sdf_gt, batch_split)
 
-            pred_sdf = decoder(inputs)
+            batch_loss = 0.0
 
-            if enforce_minmax:
-                pred_sdf = deep_sdf.utils.threshold_min_max(
-                    pred_sdf, min_vec, max_vec
-                )
+            optimizer_all.zero_grad()
 
-            loss = loss_l1(pred_sdf, sdf_gt) / batch_split
+            for i in range(batch_split):
 
-            # this is where the latent code is optimized by using it's loss
-            if do_code_regularization:
-                l2_size_loss = latent_size_regul(lat_vecs, indices.numpy()) / batch_split
-                loss += code_reg_lambda * min(1, epoch / 100) * l2_size_loss
+                batch_vecs = lat_vecs(indices[i])
 
-            loss.backward()
+                input = torch.cat([batch_vecs, xyz[i]], dim=1)
 
-            batch_loss += loss.item()  # aggregated weight & latent code losses
+                # NN optimization
+                pred_sdf = decoder(input)
 
-            _subbatch += 1
-            if _subbatch == batch_split:
-                _subbatch = 0
-                loss_log.append(batch_loss)
+                if enforce_minmax:
+                    pred_sdf = torch.clamp(pred_sdf, minT, maxT)
 
-                if grad_clip is not None:
-                    torch.nn.utils.clip_grad_norm_(decoder.parameters(), grad_clip)
+                chunk_loss = loss_l1(pred_sdf, sdf_gt[i].to(device=device)) / num_sdf_samples
 
-                optimizer_all.step()
+                if do_code_regularization:
+                    l2_size_loss = torch.sum(torch.norm(batch_vecs, dim=1))
+                    reg_loss = (
+                                       code_reg_lambda * min(1, epoch / 100) * l2_size_loss
+                               ) / num_sdf_samples
 
-                # Project latent vectors onto sphere
-                if code_bound is not None:
-                    deep_sdf.utils.project_vecs_onto_sphere(lat_vecs, code_bound)
+                    chunk_loss = chunk_loss + reg_loss.to(device=device)
 
-                # tb.add_scalar('Batch_Loss', batch_loss, epoch)
+                chunk_loss.backward()
+
+                batch_loss += chunk_loss.item()
+
+            logging.debug("loss = {}".format(batch_loss))
+
+            loss_log.append(batch_loss)
+
+            if grad_clip is not None:
+                torch.nn.utils.clip_grad_norm_(decoder.parameters(), grad_clip)
+
+            optimizer_all.step()
 
         end = time.time()
 
@@ -499,17 +517,9 @@ def main_function(experiment_directory, continue_from, batch_split, device):
 
         lr_log.append([schedule.get_learning_rate(epoch) for schedule in lr_schedules])
 
-        mean_latent_mag = get_mean_latent_vector_magnitude(lat_vecs)
-        lat_mag_log.append(mean_latent_mag)
+        lat_mag_log.append(get_mean_latent_vector_magnitude(lat_vecs))
 
         append_parameter_magnitudes(param_mag_log, decoder)
-
-        # tb.add_scalar('lrDecoder', lr_schedules[0].get_learning_rate(epoch), epoch)
-        # tb.add_scalar('lrLatent', lr_schedules[1].get_learning_rate(epoch), epoch)
-        # tb.add_scalar('Mean_Latent_Magnitude', mean_latent_mag, epoch)
-        # for name, weight in decoder.named_parameters():
-        #     tb.add_histogram(name, weight, epoch)
-        #     tb.add_histogram(f'{name}.grad', weight.grad, epoch)
 
         if epoch in checkpoints:
             save_checkpoints(epoch)

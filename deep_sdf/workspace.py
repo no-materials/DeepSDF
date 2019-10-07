@@ -84,13 +84,18 @@ def load_latent_vectors(experiment_directory, checkpoint, device):
 
     data = torch.load(filename)
 
-    num_vecs = data["latent_codes"].size()[0]
+    if isinstance(data["latent_codes"], torch.Tensor):
+        num_vecs = data["latent_codes"].size()[0]
+        lat_vecs = []
+        for i in range(num_vecs):
+            lat_vecs.append(data["latent_codes"][i].to(device=device))
 
-    lat_vecs = []
-    for i in range(num_vecs):
-        lat_vecs.append(data["latent_codes"][i].to(device=device))
-
-    return lat_vecs
+        return lat_vecs
+    else:
+        num_embeddings, embedding_dim = data["latent_codes"]["weight"].shape
+        lat_vecs = torch.nn.Embedding(num_embeddings, embedding_dim)
+        lat_vecs.load_state_dict(data["latent_codes"])
+        return lat_vecs.weight.data.detach()
 
 
 def get_data_source_map_filename(data_dir):
